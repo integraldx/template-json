@@ -1,23 +1,22 @@
-name: 'The name of your action here'
-description: 'Provide a description here'
-author: 'Your name or organization here'
+name: 'template-json'
+description: 'Render json template'
+author: 'integraldx@integraldx.me'
 
-# Add your action's branding here. This will appear on the GitHub Marketplace.
 branding:
   icon: 'heart'
   color: 'red'
 
-# Define your inputs here.
 inputs:
-  milliseconds:
-    description: 'Your input description here'
+  template:
+    description: 'Template json string'
     required: true
-    default: '1000'
+  values:
+    description: 'Values required to render template, as json object'
+    required: true
 
-# Define your outputs here.
 outputs:
-  time:
-    description: 'Your output description here'
+  rendered:
+    description: 'rendered json string'
 
 runs:
   using: node20

@@ -1834,6 +1834,154 @@ function isLoopbackAddress(host) {
 
 /***/ }),
 
+/***/ 1278:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+module.exports.string = __nccwpck_require__(4540);
+module.exports.object = __nccwpck_require__(5581);
+
+
+/***/ }),
+
+/***/ 5581:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+var renderString = __nccwpck_require__(4540);
+
+function walkObject(object, handler) {
+  if (Array.isArray(object)) return walkArray(object, handler);
+  var result = {};
+
+  for (var key in object) {
+    result[walk(key, handler, null)] = walk(object[key], handler, key);
+  }
+
+  return result;
+}
+
+function walkArray(array, handler) {
+  return array.map(function(input) {
+    return walk(input, handler, null);
+  });
+}
+
+/**
+Walk the object and invoke the function on string types.
+
+Why write yet-another cloner/walker? The primary reason is we also want to run
+template functions on keys _and_ values which most clone things don't do.
+
+@param {Object} input object to walk and duplicate.
+@param {Function} handler handler to invoke on string types.
+@param {?String} [key] key corresponding to input, if the latter is a value in object
+*/
+function walk(input, handler, key) {
+  switch (typeof input) {
+    // object is slightly special if null we move on
+    case 'object':
+      if (!input) return input;
+      return walkObject(input, handler);
+
+    case 'string':
+      return handler(input, key);
+    // all other types cannot be mutated
+    default:
+      return input;
+  }
+}
+
+function render(object, view, handler) {
+  handler = handler || renderString;
+
+  return walk(object, function(value, key) {
+    return handler(value, view, key);
+  }, null);
+}
+
+module.exports = render;
+
+
+/***/ }),
+
+/***/ 4540:
+/***/ ((module) => {
+
+/**
+Convert a dotted path to a location inside an object.
+
+@private
+@example
+
+  // returns xfoo
+  extractValue('wow.it.works', {
+    wow: {
+      it: {
+        works: 'xfoo'
+      }
+    }
+  });
+
+  // returns undefined
+  extractValue('xfoo.bar', { nope: 1 });
+
+@param {String} path dotted to indicate levels in an object.
+@param {Object} view for the data.
+*/
+function extractValue(path, view) {
+  // Short circuit for direct matches.
+  if (view && view[path]) return view[path];
+
+  var parts = path.split('.');
+
+  while (
+    // view should always be truthy as all objects are.
+    view &&
+    // must have a part in the dotted path
+    (part = parts.shift())
+  ) {
+    view = (typeof view === 'object' && part in view) ?
+      view[part] :
+      undefined;
+  }
+
+  return view;
+}
+
+var REGEX = new RegExp('{{([a-zA-Z.-_0-9]+)}}', 'g');
+var TEMPLATE_OPEN = '{{';
+
+/**
+NOTE: I also wrote an implementation that does not use regex but it is actually slower
+      in real world usage and this is easier to understand.
+
+@param {String} input template.
+@param {Object} view details.
+*/
+function replace(input, view) {
+  // optimization to avoid regex calls (indexOf is strictly faster)
+  if (input.indexOf(TEMPLATE_OPEN) === -1) return input;
+  var result;
+  var replaced = input.replace(REGEX, function(original, path) {
+    var value = extractValue(path, view);
+    if (undefined === value || null === value) {
+      return original;
+    }
+
+    if (typeof value === 'object') {
+      result = value;
+      return;
+    }
+
+    return value;
+  });
+  return (undefined !== result) ? result : replaced;
+}
+
+module.exports = replace;
+
+
+/***/ }),
+
 /***/ 4294:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
@@ -24736,22 +24884,19 @@ var __importStar = (this && this.__importStar) || function (mod) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = void 0;
 const core = __importStar(__nccwpck_require__(2186));
-const wait_1 = __nccwpck_require__(5259);
+const json_templater_1 = __nccwpck_require__(1278);
 /**
  * The main function for the action.
  * @returns {Promise<void>} Resolves when the action is complete.
  */
 async function run() {
     try {
-        const ms = core.getInput('milliseconds');
-        // Debug logs are only output if the `ACTIONS_STEP_DEBUG` secret is true
-        core.debug(`Waiting ${ms} milliseconds ...`);
-        // Log the current timestamp, wait, then log the new timestamp
-        core.debug(new Date().toTimeString());
-        await (0, wait_1.wait)(parseInt(ms, 10));
-        core.debug(new Date().toTimeString());
-        // Set outputs for other workflow steps to use
-        core.setOutput('time', new Date().toTimeString());
+        const template_tring = core.getInput('template');
+        const values_string = core.getInput('values');
+        const template = JSON.parse(template_tring);
+        const values = JSON.parse(values_string);
+        const rendered_object = (0, json_templater_1.object)(template, values);
+        core.setOutput('rendered', JSON.stringify(rendered_object));
     }
     catch (error) {
         // Fail the workflow run if an error occurs
@@ -24760,31 +24905,6 @@ async function run() {
     }
 }
 exports.run = run;
-
-
-/***/ }),
-
-/***/ 5259:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.wait = void 0;
-/**
- * Wait for a number of milliseconds.
- * @param milliseconds The number of milliseconds to wait.
- * @returns {Promise<string>} Resolves with 'done!' after the wait is over.
- */
-async function wait(milliseconds) {
-    return new Promise(resolve => {
-        if (isNaN(milliseconds)) {
-            throw new Error('milliseconds not a number');
-        }
-        setTimeout(() => resolve('done!'), milliseconds);
-    });
-}
-exports.wait = wait;
 
 
 /***/ }),
